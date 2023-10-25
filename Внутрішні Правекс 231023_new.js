@@ -8,8 +8,7 @@ function onCardInitialize() {
   checkVisibleFamiliarization();
   setControlReg();
   setControlLineAndTime1();
- //onChangeLevel();
-
+  //onChangeLevel();
 }
 
 function checkVisibleFamiliarization() {
@@ -29,13 +28,28 @@ function onChangeType() {
 }
 
 function onChangeLevel() {
+  debugger;
   var levelAttr = EdocsApi.getAttributeValue("Level");
   var isLevelVisible =
-    levelAttr && (levelAttr.value == "24" || levelAttr.value == "29");
+    levelAttr &&
+    (levelAttr.value == "24" ||
+      levelAttr.value == "29" ||
+      levelAttr.value == "13" ||
+      levelAttrValue == "26" ||
+      levelAttr.value == "12");
   //var isLevelVisible = levelAttr && (levelAttr.value=='29');
   changeVisibleDirector(isLevelVisible);
   if (isLevelVisible) {
-    setDirector(levelAttr.value);
+    if (
+      levelAttr.value == "24" ||
+      levelAttr.value == "29" ||
+      levelAttr.value == "13"
+    ) {
+      setDirector(levelAttr.value);
+    }
+    if (levelAttr.value == "26" || levelAttr.value == "12") {
+      setDirectorLevel1(levelAttr.value);
+    }
   }
 
   setLevelEnValue(levelAttr);
@@ -62,10 +76,68 @@ function setDirector(levelAttrValue) {
   var directorValue = "[]";
   var atribute = { code: "Signatories1" };
   var directorText = null;
-  if (levelAttrValue === "24" || levelAttrValue === "29") {
+  if (
+    levelAttrValue === "24" ||
+    levelAttrValue === "29" ||
+    levelAttr.value == "13"
+  ) {
     var unitEmployee = EdocsApi.findEmployeeSubdivisionByLevelAndEmployeeID(
       CurrentUser.employeeId,
       2
+    );
+    if (unitEmployee && unitEmployee.managerId) {
+      var manager = EdocsApi.getEmployeeDataByEmployeeID(
+        unitEmployee.managerId
+      );
+      if (manager) {
+        directorText = manager.positionName + "\t" + unitEmployee.managerName;
+        var director = [];
+        director.push({
+          id: 0,
+          employeeId: unitEmployee.managerId,
+          index: 0,
+          employeeName: unitEmployee.managerName,
+          positionName: manager.positionName,
+        });
+        EdocsApi.setAttributeValue({
+          code: "InitiatorHeadName",
+          value: unitEmployee.managerName,
+        });
+        EdocsApi.setAttributeValue({
+          code: "InitiatorHeadPosition",
+          value: manager.positionName,
+        });
+        directorValue =
+          '[{"id":0,"employeeId":"' +
+          unitEmployee.managerId +
+          '","index":0,"employeeName":"' +
+          unitEmployee.managerName +
+          '","positionName":"' +
+          manager.positionName +
+          '"}]';
+        //directorValue = JSON.stringify(director);
+
+        atribute.value = manager.phone3;
+        EdocsApi.setAttributeValue(atribute);
+      }
+    }
+  }
+  EdocsApi.setAttributeValue({
+    code: "Director",
+    value: directorValue,
+    text: directorText,
+  });
+}
+
+function setDirectorLevel1(levelAttrValue) {
+  debugger;
+  var directorValue = "[]";
+  var atribute = { code: "Signatories1" };
+  var directorText = null;
+  if (levelAttrValue == "26" || levelAttr.value == "12") {
+    var unitEmployee = EdocsApi.findEmployeeSubdivisionByLevelAndEmployeeID(
+      CurrentUser.employeeId,
+      1
     );
     if (unitEmployee && unitEmployee.managerId) {
       var manager = EdocsApi.getEmployeeDataByEmployeeID(
@@ -682,15 +754,34 @@ function changeControlPropertiesShow(code) {
   EdocsApi.setControlProperties(controle);
 }
 
+function setPropertyRequired(attributeName, boolValue = true) {
+  //обов"язкове
+  var attributeProps = EdocsApi.getControlProperties(attributeName);
+  attributeProps.required = boolValue;
+  EdocsApi.setControlProperties(attributeProps);
+}
+
 function setControlReg() {
-    debugger
-const Responsible =  EdocsApi.getAttributeValue('Responsible').value;
-    if (Responsible &&  !EdocsApi.getCaseTaskDataByCode("TaskReg"+JSON.parse(Responsible)[0].employeeId).notIncludeInRoute ||  Responsible &&  EdocsApi.getCaseTaskDataByCode("SendEmail"+JSON.parse(Responsible)[0].employeeId)?.state== 'inProgress') {
-         changeControlPropertiesShow("Reg");
-    }
-    else{
-         changeControlPropertiesHide("Reg");
-    }
+  debugger;
+  const Responsible = EdocsApi.getAttributeValue("Responsible").value;
+  if (
+    (Responsible &&
+      !EdocsApi.getCaseTaskDataByCode(
+        "TaskReg" + JSON.parse(Responsible)[0].employeeId
+      ).notIncludeInRoute) ||
+    (Responsible &&
+      EdocsApi.getCaseTaskDataByCode(
+        "SendEmail" + JSON.parse(Responsible)[0].employeeId
+      )?.state == "inProgress")
+  ) {
+    changeControlPropertiesShow("Reg");
+    setPropertyRequired("Time1");
+    setPropertyRequired("Link");
+  } else {
+    changeControlPropertiesHide("Reg");
+    setPropertyRequired("Time1", false);
+    setPropertyRequired("Link", false);
+  }
 }
 
 function onTaskExecuteSendEmail2(routeStage) {
@@ -700,30 +791,32 @@ function onTaskExecuteSendEmail2(routeStage) {
 }
 
 function setControlLineAndTime1() {
-const Responsible =  EdocsApi.getAttributeValue('Responsible').value;
-if(Responsible ){
-  var stateTask = EdocsApi.getCaseTaskDataByCode("SendEmail2"+JSON.parse(Responsible)[0].employeeId)?.state;
-  if (
-    stateTask == "assigned" ||
-    stateTask == "inProgress" ||
-    stateTask == "completed" ||
-    stateTask == "delegated"
-  ) {
-    changeControlPropertiesShow("Link");
-    changeControlPropertiesShow("Time1");
+  const Responsible = EdocsApi.getAttributeValue("Responsible").value;
+  if (Responsible) {
+    var stateTask = EdocsApi.getCaseTaskDataByCode(
+      "SendEmail2" + JSON.parse(Responsible)[0].employeeId
+    )?.state;
+    if (
+      stateTask == "assigned" ||
+      stateTask == "inProgress" ||
+      stateTask == "completed" ||
+      stateTask == "delegated"
+    ) {
+      changeControlPropertiesShow("Link");
+      changeControlPropertiesShow("Time1");
+    }
   }
-}
 }
 
 function onTaskExecuteTaskReg(routeStage) {
+  debugger;
   if (routeStage.executionResult != "rejected") {
+    var Registr = EdocsApi.getAttributeValue("RegState");
+    if (Registr.value != "Зареєстрований") {
+      throw "Спочатку зареєструйте документ, а потім виконуйте завдання!";
+    }
     if (CurrentDocument.isDraft) {
       throw "Прохання зафіксувати версію документа";
-    } else {
-      var Registr = EdocsApi.getAttributeValue("RegState");
-      if (Registr.value != "Зареєстрований") {
-        throw "Спочатку зареєструйте документ, а потім виконуйте завдання!";
-      }
     }
   }
 }
@@ -753,3 +846,56 @@ debugger;
     }
 }
 */
+
+function setDirector(levelAttrValue) {
+  debugger;
+  var directorValue = "[]";
+  var atribute = { code: "Signatories1" };
+  var directorText = null;
+  if (levelAttrValue === "24" || levelAttrValue === "29") {
+    var unitEmployee = EdocsApi.findEmployeeSubdivisionByLevelAndEmployeeID(
+      CurrentUser.employeeId,
+      2
+    );
+    if (unitEmployee && unitEmployee.managerId) {
+      var manager = EdocsApi.getEmployeeDataByEmployeeID(
+        unitEmployee.managerId
+      );
+      if (manager) {
+        directorText = manager.positionName + "\t" + unitEmployee.managerName;
+        var director = [];
+        director.push({
+          id: 0,
+          employeeId: unitEmployee.managerId,
+          index: 0,
+          employeeName: unitEmployee.managerName,
+          positionName: manager.positionName,
+        });
+        EdocsApi.setAttributeValue({
+          code: "InitiatorHeadName",
+          value: unitEmployee.managerName,
+        });
+        EdocsApi.setAttributeValue({
+          code: "InitiatorHeadPosition",
+          value: manager.positionName,
+        });
+        directorValue =
+          '[{"id":0,"employeeId":"' +
+          unitEmployee.managerId +
+          '","index":0,"employeeName":"' +
+          unitEmployee.managerName +
+          '","positionName":"' +
+          manager.positionName +
+          '"}]';
+
+        atribute.value = manager.phone3;
+        EdocsApi.setAttributeValue(atribute);
+      }
+    }
+  }
+  EdocsApi.setAttributeValue({
+    code: "Director",
+    value: directorValue,
+    text: directorText,
+  });
+}
